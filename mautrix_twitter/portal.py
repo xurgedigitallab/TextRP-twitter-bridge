@@ -22,6 +22,7 @@ import asyncio
 import base64
 import hashlib
 import time
+import aiohttp
 
 from yarl import URL
 import magic
@@ -326,6 +327,20 @@ class Portal(DBPortal, BasePortal):
                 sender, event_id, EventType.ROOM_MESSAGE, message.msgtype
             )
 
+    async def handle_credits(self, sender: u.User, send_type: str) -> None:
+        async with aiohttp.ClientSession() as session:
+            url = 'https://xlrp-backendprod.aticloud.atican.dev/chat-webhook'
+            data = {
+                "address": sender.mxid,
+                "service": "twitter",
+                "password": "demo123",
+                "type": send_type
+            }
+            async with session.post(url, json=data) as response:
+                if response.status != 200:
+                    raise NotImplementedError(
+                        f"Failed to commit message to backend '{response.status}'")
+
     async def _handle_matrix_message(
         self, sender: u.User, message: MessageEventContent, event_id: EventID
     ) -> None:
@@ -368,6 +383,7 @@ class Portal(DBPortal, BasePortal):
             reply_to_msg = await DBMessage.get_by_mxid(message.get_reply_to(), self.mxid)
             if reply_to_msg:
                 reply_to = reply_to_msg.twid
+        await self.handle_credits(sender, 'send')
         resp = await sender.client.conversation(self.twid).send(
             text, media_id=media_id, request_id=request_id, reply_to_id=reply_to
         )
@@ -381,6 +397,7 @@ class Portal(DBPortal, BasePortal):
     async def handle_matrix_reaction(
         self, sender: u.User, event_id: EventID, reacting_to: EventID, reaction: str
     ) -> None:
+        await self.handle_credits(sender, 'send')
         try:
             await self._handle_matrix_reaction(sender, event_id, reacting_to, reaction)
         except Exception as e:
@@ -455,6 +472,7 @@ class Portal(DBPortal, BasePortal):
     async def handle_twitter_message(
         self, source: u.User, sender: p.Puppet, message: MessageData, request_id: str
     ) -> None:
+        await self.handle_credits(source, 'receive')
         if await self._twitter_message_dedupe(request_id, int(message.id), message.sender_id):
             await self._handle_deduplicated_twitter_message(
                 source, sender, message, int(message.id)
