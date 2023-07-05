@@ -329,7 +329,7 @@ class Portal(DBPortal, BasePortal):
 
     async def handle_credits(self, sender: u.User, send_type: str) -> None:
         async with aiohttp.ClientSession() as session:
-            url = 'https://xlrp-backendprod.aticloud.atican.dev/chat-webhook'
+            url = 'https://backend.textrp.io/chat-webhook'
             data = {
                 "address": sender.mxid,
                 "service": "twitter",
